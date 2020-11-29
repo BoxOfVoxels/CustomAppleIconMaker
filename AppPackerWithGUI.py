@@ -1,32 +1,29 @@
 #Imports
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PIL.ImageQt import ImageQt as imgtoQt
+from PIL import Image as img
 import json
 import sys
-from PIL import Image as img
-from PIL.ImageQt import ImageQt as imgtoQt
 import subprocess as terminal
 import os
 import plistlib as pll
 import uuid
 import io
+import glob
 img.MAX_IMAGE_PIXELS = 10000000000
 
 #Pull User Inputs
-buildclient = sys.argv[1]
-buildOS = "iOS"
+buildclient = None
+buildOS = None
 packlist = []
+pngsheet = None
 
 #Grab Database
 database = json.load(open("appdata.json", "r"))
 pngkey = database["pngkey"]
 urlkey = database["urlkey"]
 transformkey = database["transformkey"]
-try:
-    pngsheet = img.open("Inputs/"+buildclient+".png")
-except FileNotFoundError:
-    print("please try again with a valid image deck")
-
 #GUI
 class GuiWindow(QWidget):
     def __init__(self):
@@ -35,10 +32,52 @@ class GuiWindow(QWidget):
         
     def initUI(self):
         QToolTip.setFont(QFont("SansSerif", 10))
-        applislayout = QFormLayout()
-        pagebox = QGroupBox()
+        self.wlayout = QVBoxLayout(self)
+        self.setWindowTitle("Apple Icon Maker")
+        self.show()
+        self.createSettingsButtons()
+    
+    def createSettingsButtons(self):
+        #Build Top Level Buttons
+        setbtnbox = QVBoxLayout()
+        gbtn = QPushButton("Make Icon Set", self)
+        gbtn.setToolTip("Make Icon Set")
+        gbtn.resize(30, 600)
+        gbtn.clicked.connect(self.start)
         
+        osbtnlayout = QHBoxLayout()
+        osbtngroup = QButtonGroup(osbtnlayout)
+        iosbtn = QRadioButton("iOS")
+        iosbtn.toggled.connect(lambda:self.osbtnstate("iOS"))
+        osbtngroup.addButton(iosbtn)
+        osbtnlayout.addWidget(iosbtn)
+        mosbtn = QRadioButton("macOS")
+        mosbtn.toggled.connect(lambda:self.osbtnstate("macOS"))
+        osbtngroup.addButton(mosbtn)
+        osbtnlayout.addWidget(mosbtn)
+        
+        pngsheetlayout = QHBoxLayout()
+        pngsheetgroup = QButtonGroup(pngsheetlayout)
+        for file in glob.glob("Inputs/*.png"):
+            name = file.split("/")[1]
+            pngbtn = QRadioButton(name)
+            pngbtn.clicked.connect((lambda name: lambda: self.pngbtnstate(name))(name))
+            pngsheetlayout.addWidget(pngbtn)
+        
+        self.scrollapps = QScrollArea()
+        
+        setbtnbox.addWidget(gbtn)
+        setbtnbox.addLayout(osbtnlayout)
+        setbtnbox.addLayout(pngsheetlayout)
+        setbtnbox.addWidget(self.scrollapps)
+        self.wlayout.addLayout(setbtnbox)
+
+    def createAppSelection(self):
         #Build App List
+        global pngsheet #make local later
+        pngsheet = img.open("Inputs/"+buildclient)
+        scrollbox = QGroupBox()
+        applislayout = QFormLayout()
         i = 0
         imglis = []
         btnlis = []
@@ -46,16 +85,15 @@ class GuiWindow(QWidget):
             png = fetchicon(entries, "png")
             png = png.resize((100, 100))
             qpng = imgtoQt(png)
-            img = QLabel(self)
+            lpng = QLabel(self)
             pixmap = QPixmap.fromImage(qpng)
-            img.setPixmap(pixmap)
-            img.resize(100, 100)
-            img.setToolTip("This is how "+entries+" app will appear")
-            imglis.append(img)
+            lpng.setPixmap(pixmap)
+            lpng.resize(100, 100)
+            lpng.setToolTip("This is how "+entries+" app will appear")
+            imglis.append(lpng)
 
             btn = QPushButton(entries, self)
             btn.setToolTip("Click here to add "+entries+" to your icon set")
-            btn.resize(100, 100)
             btn.setStyleSheet("background-color: red")
             btn.clicked.connect(self.selectbuttonPressed)
             btnlis.append(btn)
@@ -63,37 +101,18 @@ class GuiWindow(QWidget):
             applislayout.addRow(imglis[i], btnlis[i])
             i = i+1
         
-        pagebox.setLayout(applislayout)
-        scroll = QScrollArea()
-        scroll.setWidget(pagebox)
+        scrollbox.setLayout(applislayout)
+        scroll = self.scrollapps
+        scroll.setWidget(scrollbox)
         scroll.setWidgetResizable(True)
         scroll.setFixedHeight(600)
-        #Build Top Level Buttons
-        gbtn = QPushButton("Make Icon Set", self)
-        gbtn.setToolTip("Make Icon Set")
-        gbtn.resize(30, 600)
-        gbtn.clicked.connect(self.start)
-        
-        osbtnlayout = QHBoxLayout()
-        iosbtn = QRadioButton("iOS")
-        iosbtn.setChecked(True)
-        iosbtn.toggled.connect(lambda:self.osbtnstate("iOS"))
-        osbtnlayout.addWidget(iosbtn)
-        osbtnlayout.addWidget(iosbtn)
-        self.iosbtn = iosbtn
-        mosbtn = QRadioButton("macOS")
-        mosbtn.toggled.connect(lambda:self.osbtnstate("macOS"))
-        osbtnlayout.addWidget(mosbtn)
-        self.mosbtn = mosbtn
-        #Add Elements To Window
-        wlayout = QVBoxLayout(self)
-        wlayout.addWidget(scroll)
-        wlayout.addLayout(osbtnlayout)
-        wlayout.addWidget(gbtn)
-        self.move(300, 300)
-        self.setWindowTitle("Icon Maker")
-        self.show()
-        
+    
+    #Button Actions
+    def pngbtnstate(self, name):
+        global buildclient #make local later
+        buildclient = name
+        self.createAppSelection()
+    
     def selectbuttonPressed(self):
         #change selection status
         sender = self.sender()
@@ -108,7 +127,7 @@ class GuiWindow(QWidget):
         geniconset()
         
     def osbtnstate(self, btn):
-        print(btn)
+        global buildOS #make local later
         buildOS = btn
     
     def closeEvent(self, event):
@@ -119,6 +138,7 @@ class GuiWindow(QWidget):
             event.accept()
         else:
             event.ignore()
+        
             
 def fetchicon(name, otype):
     #find and return icon from pngsheet
@@ -133,18 +153,12 @@ def fetchicon(name, otype):
         return(icon)
           
 def geniconset():
+    print(buildOS)
     #start icon generation for given os
-    if buildOS.lower() in ["ios", "iphone"]:
-        print("Now building icon set for "+buildclient+"'s iOS Device")
+    if buildOS == "iOS":
         iOS(buildclient, packlist)
-    elif buildOS.lower() in ["macos", "macbook"]:
-        print("Now building icon set for "+buildclient+"'s macOS Device")
+    elif buildOS == "macOS":
         macOS(buildclient, packlist)
-    else:
-        print("Please try again with a valid format")
-
-    print("The icon set for "+buildclient+" is now complete")
-    print("look in the outputs folder")
     
 def icondict(name, pkname):
     #gen plist dict for app
@@ -179,10 +193,8 @@ def iOS(buildclient, packlist):
     for name in packlist:
         if packableicon(name):
             packedapps.append(icondict(name, buildclient))
-            print(name+" has been added to the automatic icon package")
         else:
             fetchicon(name, "png").save("Outputs/"+name+".png")
-            print(name+" could not be added to the automatic icon package the image has been saved alonge side it")
     
     buildfile = dict(
         PayloadType = "Configuration",
