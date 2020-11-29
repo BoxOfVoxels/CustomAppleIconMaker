@@ -94,7 +94,10 @@ class GuiWindow(QWidget):
 
             btn = QPushButton(entries, self)
             btn.setToolTip("Click here to add "+entries+" to your icon set")
-            btn.setStyleSheet("background-color: red")
+            if entries in packlist:
+                btn.setStyleSheet("background-color: green")
+            else:
+                btn.setStyleSheet("background-color: red")
             btn.clicked.connect(self.selectbuttonPressed)
             btnlis.append(btn)
             
@@ -117,6 +120,7 @@ class GuiWindow(QWidget):
         #change selection status
         sender = self.sender()
         if sender.styleSheet() == "background-color: green":
+            packlist.remove(sender.text())
             sender.setStyleSheet("background-color: red")
         else:
             packlist.append(sender.text())
