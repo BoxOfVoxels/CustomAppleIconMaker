@@ -57,8 +57,9 @@ class GuiWindow(QWidget):
         QToolTip.setFont(QFont("SansSerif", 10))
         self.wlayout = QVBoxLayout(self)
         self.setWindowTitle("Apple Icon Maker")
-        self.show()
+        self.resize(400, 800)
         self.createSettingsButtons()
+        self.show()
     
     def createSettingsButtons(self):
         #Build Top Level Buttons
@@ -78,6 +79,7 @@ class GuiWindow(QWidget):
         mosbtn.toggled.connect(lambda:self.osbtnstate("macOS"))
         osbtngroup.addButton(mosbtn)
         osbtnlayout.addWidget(mosbtn)
+        osbtnlayout.addStretch(1)
         
         pbtn = QPushButton("Select Icon Sheet", self)
         pbtn.setToolTip("This is how you choose your icon set")
@@ -143,7 +145,15 @@ class GuiWindow(QWidget):
     
     def start(self):
         #starts generation
-        geniconset(self.buildInfo)
+        errorcodes = []
+        if self.buildInfo.client == None:
+            errorcodes.append("Icon Sheet")
+        if self.buildInfo.OS == None:
+            errorcodes.append("OS")
+        if not errorcodes:
+            geniconset(self.buildInfo)
+        self.starterror(errorcodes)
+        
         
     def selectpngsheet(self):
         #Button Actions
@@ -157,6 +167,13 @@ class GuiWindow(QWidget):
     
     def osbtnstate(self, btn):
         self.buildInfo.OS = btn
+    
+    def starterror(self, codes):
+        errormessage = ""
+        for code in codes:
+            errormessage = errormessage + "You have not selected a " + code + "\n"
+        
+        edlg = QMessageBox.question(self, "Message", errormessage, QMessageBox.Ok, QMessageBox.Ok)
     
     def closeEvent(self, event):
         #Quit dialog box
