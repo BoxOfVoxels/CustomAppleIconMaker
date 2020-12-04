@@ -20,4 +20,3 @@ if appurl:
 ofile = open("appdata.json", "w")
 json.dump(data, ofile, indent=4)
 ofile.close()
-

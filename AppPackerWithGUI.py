@@ -47,19 +47,40 @@ class BuildInfo():
         
 
 #GUI
-class GuiWindow(QWidget):
+class PackerWindow(QMainWindow):
     def __init__(self, buildInfo):
         super().__init__()
         self.buildInfo = buildInfo
+        self.setWindowTitle("Apple Icon Maker")
+        self.setGeometry(300, 100, 400, 800)
         self.initUI()
         
     def initUI(self):
         QToolTip.setFont(QFont("SansSerif", 10))
-        self.wlayout = QVBoxLayout(self)
-        self.setWindowTitle("Apple Icon Maker")
-        self.resize(400, 800)
+        cwidget = QWidget()
+        wlayout = QVBoxLayout()
+        cwidget.setLayout(wlayout)
+        self.setCentralWidget(cwidget)
+        self.wlayout = wlayout
+        self.createMenuBar()
         self.createSettingsButtons()
         self.show()
+
+    def createMenuBar(self):
+        menubar = self.menuBar()
+        
+        fileMenu = menubar.addMenu("File")
+        openAct = QAction("Open", self)
+        openAct.triggered.connect(self.openAction)
+        fileMenu.addAction(openAct)
+        
+        editMenu = menubar.addMenu("Edit")
+        selectallAct = QAction("Select All", self)
+        selectallAct.triggered.connect(self.selectallAction)
+        editMenu.addAction(selectallAct)
+        deselectallAct = QAction("Deselect All", self)
+        deselectallAct.triggered.connect(self.deselectallAction)
+        editMenu.addAction(deselectallAct)
     
     def createSettingsButtons(self):
         #Build Top Level Buttons
@@ -67,16 +88,18 @@ class GuiWindow(QWidget):
         gbtn = QPushButton("Make Icon Set", self)
         gbtn.setToolTip("Make Icon Set")
         gbtn.resize(30, 500)
-        gbtn.clicked.connect(self.start)
+        gbtn.clicked.connect(self.makeiconAction)
         
         osbtnlayout = QHBoxLayout()
         osbtngroup = QButtonGroup(osbtnlayout)
         iosbtn = QRadioButton("iOS")
-        iosbtn.toggled.connect(lambda:self.osbtnstate("iOS"))
+        iosbtn.clicked.connect(self.toggleOSAction)
+        iosbtn.setChecked(True)
+        self.buildInfo.OS = "iOS"
         osbtngroup.addButton(iosbtn)
         osbtnlayout.addWidget(iosbtn)
         mosbtn = QRadioButton("macOS")
-        mosbtn.toggled.connect(lambda:self.osbtnstate("macOS"))
+        mosbtn.clicked.connect(self.toggleOSAction)
         osbtngroup.addButton(mosbtn)
         osbtnlayout.addWidget(mosbtn)
         osbtnlayout.addStretch(1)
@@ -84,7 +107,7 @@ class GuiWindow(QWidget):
         pbtn = QPushButton("Select Icon Sheet", self)
         pbtn.setToolTip("This is how you choose your icon set")
         pbtn.resize(30, 500)
-        pbtn.clicked.connect(self.selectpngsheet)
+        pbtn.clicked.connect(self.openAction)
         
         self.scrollapps = QScrollArea()
         
@@ -121,19 +144,20 @@ class GuiWindow(QWidget):
                 btn.setStyleSheet("background-color: green")
             else:
                 btn.setStyleSheet("background-color: red")
-            btn.clicked.connect(self.selectbuttonPressed)
+            btn.clicked.connect(self.selectbuttonAction)
             btnlis.append(btn)
             
             applislayout.addRow(imglis[i], btnlis[i])
             i = i+1
         
+        self.selectappbtnlis = btnlis
         scrollbox.setLayout(applislayout)
         scroll = self.scrollapps
         scroll.setWidget(scrollbox)
         scroll.setWidgetResizable(True)
         scroll.setFixedHeight(600)
     
-    def selectbuttonPressed(self):
+    def selectbuttonAction(self):
         #change selection status
         sender = self.sender()
         if sender.styleSheet() == "background-color: green":
@@ -143,7 +167,14 @@ class GuiWindow(QWidget):
             self.buildInfo.packlist.append(sender.text())
             sender.setStyleSheet("background-color: green")
     
-    def start(self):
+    def makeiconAction(self):
+        def starterror(codes):
+            errormessage = ""
+            for code in codes:
+                errormessage = errormessage + "You have not selected a " + code + "\n"
+
+            if errormessage != "":
+                errormessage = QMessageBox.question(self, "Message", errormessage, QMessageBox.Ok, QMessageBox.Ok)
         #starts generation
         errorcodes = []
         if self.buildInfo.client == None:
@@ -152,10 +183,10 @@ class GuiWindow(QWidget):
             errorcodes.append("OS")
         if not errorcodes:
             geniconset(self.buildInfo)
-        self.starterror(errorcodes)
+        starterror(errorcodes)
         
         
-    def selectpngsheet(self):
+    def openAction(self):
         #Button Actions
         fileName, _ = QFileDialog.getOpenFileName(self, "QFileDialog.getOpenFileName()", "", "All Files (*)")
         if fileName:
@@ -165,15 +196,22 @@ class GuiWindow(QWidget):
             self.buildInfo.client = clientName
             self.createAppSelection()
     
-    def osbtnstate(self, btn):
-        self.buildInfo.OS = btn
-    
-    def starterror(self, codes):
-        errormessage = ""
-        for code in codes:
-            errormessage = errormessage + "You have not selected a " + code + "\n"
+    def toggleOSAction(self):
+        sender = self.sender()
+        if sender.isChecked:
+            self.buildInfo.OS = sender.text()
+            print(self.buildInfo.OS)
         
-        edlg = QMessageBox.question(self, "Message", errormessage, QMessageBox.Ok, QMessageBox.Ok)
+    def selectallAction(self):
+        self.buildInfo.packlist = []
+        for btn in self.selectappbtnlis:
+            self.buildInfo.packlist.append(btn.text())
+            btn.setStyleSheet("background-color: green")
+    
+    def deselectallAction(self):
+        self.buildInfo.packlist = []
+        for btn in self.selectappbtnlis:
+            btn.setStyleSheet("background-color: red")
     
     def closeEvent(self, event):
         #Quit dialog box
@@ -254,7 +292,7 @@ def main():
     app = QApplication(sys.argv)
     
     buildInfo = BuildInfo()
-    widget = GuiWindow(buildInfo)
+    widget = PackerWindow(buildInfo)
     
     sys.exit(app.exec_())
     
