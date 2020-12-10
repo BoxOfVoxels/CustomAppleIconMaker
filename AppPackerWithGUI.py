@@ -139,6 +139,7 @@ class PackerWindow(QMainWindow):
             imglis.append(lpng)
 
             btn = QPushButton(entries, self)
+            btn.setMinimumSize(200, 30)
             btn.setToolTip("Click here to add "+entries+" to your icon set")
             if entries in self.buildInfo.packlist:
                 btn.setStyleSheet("background-color: green")
