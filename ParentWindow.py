@@ -67,7 +67,111 @@ class Window(QMainWindow):
         self.show()
         
     def launchEditWin(self):
-        print("add Edit later")
+        cwidget = QWidget()
+        clayout = QVBoxLayout()
+        cwidget.setLayout(clayout)
+        self.setCentralWidget(cwidget)
+        self.hiddenelements = []
+        
+        clayout.addStretch(1)
+        
+        filelayout = QHBoxLayout()
+        filelabel = QLabel("No File Selected")
+        filelayout.addWidget(filelabel)
+        filelayout.addStretch(1)
+        filebtn = QPushButton("Choose File", self)
+        filebtn.clicked.connect(self.updateEditSettingsAct)
+        filelayout.addWidget(filebtn)
+        clayout.addLayout(filelayout)
+        self.filebtn = filebtn
+        
+        imgelayout = QHBoxLayout()
+        imgelayout.addStretch(1)
+        imgelabel1 = QLabel()
+        imgelayout.addWidget(imgelabel1)
+        self.image1 = imgelabel1
+        imgelabel2 = QLabel()
+        imgelayout.addWidget(imgelabel2)
+        self.image2 = imgelabel2
+        imgelayout.addStretch(1)
+        clayout.addLayout(imgelayout)
+        
+        poselayout = QHBoxLayout()
+        poselabel1 = QLabel("Icon Size (in px)")
+        poselayout.addWidget(poselabel1)
+        self.hiddenelements.append(poselabel1)
+        posespin1 = QSpinBox()
+        posespin1.setRange(128, 4096)
+        posespin1.valueChanged.connect(self.updateEditSettingsAct)
+        self.hiddenelements.append(posespin1)
+        self.spinS = posespin1
+        poselayout.addWidget(posespin1)
+        poselayout.addStretch(1)
+        poselabel2 = QLabel("Gap Size (in px)")
+        poselayout.addWidget(poselabel2)
+        self.hiddenelements.append(poselabel2)
+        posespin2 = QSpinBox()
+        posespin2.setRange(0, 820)
+        posespin2.valueChanged.connect(self.updateEditSettingsAct)
+        self.hiddenelements.append(posespin2)
+        self.spinG = posespin2
+        poselayout.addWidget(posespin2)
+        clayout.addLayout(poselayout)
+        
+        countlayout = QHBoxLayout()
+        countlabel1 = QLabel("Colums")
+        self.hiddenelements.append(countlabel1)
+        countlayout.addWidget(countlabel1)
+        countspin1 = QSpinBox()
+        countspin1.setRange(1, 1000)
+        countspin1.valueChanged.connect(self.updateEditSettingsAct)
+        self.hiddenelements.append(countspin1)
+        self.spinC = countspin1
+        countlayout.addWidget(countspin1)
+        countlayout.addStretch(1)
+        countlabel2 = QLabel("Rows")
+        self.hiddenelements.append(countlabel2)
+        countlayout.addWidget(countlabel2)
+        countspin2 = QSpinBox()
+        countspin2.setRange(1, 1000)
+        countspin2.valueChanged.connect(self.updateEditSettingsAct)
+        self.hiddenelements.append(countspin2)
+        self.spinR = countspin2
+        countlayout.addWidget(countspin2)
+        clayout.addLayout(countlayout)
+        
+        namelayout = QHBoxLayout()
+        namelayout.addStretch(1)
+        namebox = QLineEdit()
+        namebox.setMinimumSize(250, 30)
+        namebox.setPlaceholderText("Input Theme Name Here")
+        self.name = namebox
+        namelayout.addWidget(namebox)
+        namelayout.addStretch(1)
+        clayout.addLayout(namelayout)
+        
+        createlayout = QHBoxLayout()
+        createlayout.addStretch(1)
+        createbtn = QPushButton("Edit Theme", self)
+        createbtn.clicked.connect(self.launchEditerAct)
+        createlayout.addWidget(createbtn)
+        createlayout.addStretch(1)
+        clayout.addLayout(createlayout)
+        
+        clayout.addStretch(2)
+        
+        homelayout = QHBoxLayout()
+        homelayout.addStretch(1)
+        homebtn = QPushButton("Home", self)
+        homebtn.clicked.connect(self.launchLaunchWin)
+        homelayout.addWidget(homebtn)
+        homelayout.addStretch(1)
+        clayout.addLayout(homelayout)
+        
+        for items in self.hiddenelements:
+            items.hide()
+
+        self.setCentralWidget(cwidget)
         
     def launchMakeWin(self):
         print("add Make Later")
@@ -77,6 +181,7 @@ class Window(QMainWindow):
         clayout = QVBoxLayout()
         cwidget.setLayout(clayout)
         self.setCentralWidget(cwidget)
+        self.hiddenelements = []
         
         clayout.addStretch(1)
         
@@ -160,6 +265,14 @@ class Window(QMainWindow):
         clayout.addLayout(createlayout)
         
         clayout.addStretch(2)
+        
+        homelayout = QHBoxLayout()
+        homelayout.addStretch(1)
+        homebtn = QPushButton("Home", self)
+        homebtn.clicked.connect(self.launchLaunchWin)
+        homelayout.addWidget(homebtn)
+        homelayout.addStretch(1)
+        clayout.addLayout(homelayout)
 
         self.setCentralWidget(cwidget)
     
@@ -202,10 +315,38 @@ class Window(QMainWindow):
                 self.spinR.setEnabled(True)
                 self.spinS.setEnabled(True)
                 self.spinG.setEnabled(True)
+                for items in self.hiddenelements:
+                    items.show()
         else:
             update()
         
     def launchEditerAct(self):
+        sender = self.sender()
+        if sender.text() == "Create Theme":
+            mode = False
+        else:
+            mode = True
+        if self.name.text() == "":
+            self.name.setFocus()
+            error = QMessageBox.question(self, "Message", "No Name Found", QMessageBox.Ok, QMessageBox.Ok)
+            return
+        
+        if os.path.isdir(self.name.text()):
+            if mode:
+                exsists = True
+            else:
+                error = QMessageBox.question(self, "Message", "A Theme with the name "+self.name.text()+" already exsists", QMessageBox.Ok, QMessageBox.Ok)
+                return
+        else:
+            if mode:
+                error = QMessageBox.question(self, "Message", "No Theme found with the name "+self.name.text()+" found", QMessageBox.Ok, QMessageBox.Ok)
+                return
+            else:
+                exsists = False
+                terminal.call(["mkdir", self.name.text()])
+        print(mode)
+        print(exsists)
+        
         S = self.spinS.value()
         R = self.spinR.value()
         C = self.spinC.value()
@@ -222,21 +363,11 @@ class Window(QMainWindow):
                 for coll in range(C):
                     ipic = self.iconsheet.crop((G*rows, G*coll, (G*rows)+S, (G*coll)+S))
                     icons.append(ipic)
-        print(self.name.text())
         i = 0
         for entrie in icons:
             entrie.save(self.name.text()+"/"+str(i)+".png")
             i += 1
-            
-        terminal.call(["mkdir", self.name.text()])
-        json.dump(bicons, open(self.name.text()+"/iconlist.json", "w"), indent=4)
-        terminal.call(["python3", "IconMaker.py", self.name.text(), str(i)])
-        
-def packerHandoff():
-    print("packer")
-
-def editorHandoff():
-    print("editor")
+        terminal.call(["python3", "IconMaker.py", self.name.text(), str(i), str(exsists)])
     
 def main():
     app = QApplication(sys.argv)

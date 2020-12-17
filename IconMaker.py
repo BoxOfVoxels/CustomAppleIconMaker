@@ -30,26 +30,25 @@ class RawApp():
         self.icon = icon
     
     def writeover(self, over):
-        print("Write over Called")
-        print(over.urlscheme)
         if over.urlscheme != "":
             self.urlscheme = over.urlscheme
         self.icon = over.icon
 
 class SaveInfo():
-    def __init__(self, inputs):
-        data = json.load(open("appdata2.json", "r"))
-        self.iconsheet = img.open("iconsheet.png")
+    def __init__(self, inputs, package, exs):
         self.exsistingapps = []
         self.newapps = []
-        for keys, entries in data.items():
-            print(keys)
-            newapp = RawApp()
-            croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
-            icon = self.iconsheet.crop(croppos)
-            newapp.setall(keys, entries["url"], entries["pos"], icon)
-            self.exsistingapps.append(newapp)
-            print(self.exsistingapps[0].name)
+        self.name = package
+        self.exsists = exs
+        if exs:
+            data = json.load(open(package+"/appdata.json", "r"))
+            self.iconsheet = img.open(package+"/iconsheet.png")
+            for keys, entries in data.items():
+                newapp = RawApp()
+                croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
+                icon = self.iconsheet.crop(croppos)
+                newapp.setall(keys, entries["url"], entries["pos"], icon)
+                self.exsistingapps.append(newapp)
         for icons in inputs:
             newapp = RawApp()
             newapp.icon = icons
@@ -113,7 +112,10 @@ class ApplicationEditorWindow(QMainWindow):
         btnslayout.addStretch(1)
         prevbtn = QPushButton("<", self)
         prevbtn.setMinimumSize(50, 30)
-        prevbtn.setEnabled(False)
+        if self.app == 0:
+            prevbtn.setEnabled(False)
+        prevbtn.clicked.connect(self.changeSelectionAct)
+        self.prev = prevbtn
         btnslayout.addWidget(prevbtn)
         savebtn = QPushButton("Save", self)
         savebtn.setMinimumSize(200, 30)
@@ -121,7 +123,10 @@ class ApplicationEditorWindow(QMainWindow):
         btnslayout.addWidget(savebtn)
         nextbtn = QPushButton(">", self)
         nextbtn.setMinimumSize(50, 30)
-        nextbtn.setEnabled(False)
+        if len(self.SaveInfo.newapps) == (self.app + 1):
+            nextbtn.setEnabled(False)
+        nextbtn.clicked.connect(self.changeSelectionAct)
+        self.next = nextbtn
         btnslayout.addWidget(nextbtn)
         btnslayout.addStretch(1)
         clayout.addRow(btnslayout)
@@ -132,15 +137,24 @@ class ApplicationEditorWindow(QMainWindow):
         self.urlbox = urlbox
         self.infolabel = infolabel
         self.setFixedSize(self.size())
-        
+    
+    def changeSelectionAct(self):
+        sender = self.sender()
+        if sender == self.prev:
+            self.app = self.app - 1
+        elif sender == self.next:
+            self.app = self.app + 1
+        else:
+            print("failed to ident sender")
+            return
+        self.initUI()
+    
     def updateAct(self):
-        print("updateAct Called\n")
         app = self.SaveInfo.newapps[self.app]
         sender = self.sender()
         if sender == self.namebox:
             app.name = sender.text()
             for eapps in self.SaveInfo.exsistingapps:
-                print(eapps.name, app.name)
                 if eapps.name == app.name:
                     app.exsists = True
                     self.infolabel.setText("\""+app.name+"\" has been found in this theme.")
@@ -152,11 +166,9 @@ class ApplicationEditorWindow(QMainWindow):
             app.urlscheme = sender.text()
     
     def saveAct(self):
-        print("saveAct Called")
         nextpos = len(self.SaveInfo.exsistingapps)
         savedata = []
         for napps in self.SaveInfo.newapps:
-            print(napps.name, napps.exsists)
             if napps.exsists:
                 for eapps in self.SaveInfo.exsistingapps:
                     if napps.name == eapps.name:
@@ -170,23 +182,28 @@ class ApplicationEditorWindow(QMainWindow):
         savedict = {}
         for entries in savedata:
             savedict[entries.name] = {"url": entries.urlscheme, "pos": entries.pos}
-        json.dump(savedict, open("appdata2.json", "w"), indent=4)
+        json.dump(savedict, open(self.SaveInfo.name+"/appdata.json", "w"), indent=4)
         saveiconsheet = img.new("RGBA", (1024, len(savedata)*1024))
         for entries in savedata:
             saveicon = entries.icon.resize((1024, 1024))
             saveiconsheet.paste(saveicon, (0, entries.pos*1024))
-        saveiconsheet.save("iconsheet.png")
+        saveiconsheet.save(self.SaveInfo.name+"/iconsheet.png")
         
 def main():
-    #temp
+    #import data
     name = sys.argv[1]
     number = int(sys.argv[2])
+    if sys.argv[3] == "True":
+        exs = True
+    elif sys.argv[3] == "False":
+        exs = False
     icons = []
     for i in range(number):
         icon = img.open(name+"/"+str(i)+".png")
         icons.append(icon)
-    #temp
-    saveInfo = SaveInfo(icons)
+        terminal.call(["rm", "-rf", name+"/"+str(i)+".png"])
+
+    saveInfo = SaveInfo(icons, name, exs)
     
     app = QApplication(sys.argv)
     
