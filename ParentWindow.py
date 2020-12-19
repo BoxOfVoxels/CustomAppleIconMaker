@@ -67,11 +67,18 @@ class Window(QMainWindow):
         self.show()
         
     def launchEditWin(self):
+        files = glob.glob("*")
+        themes = []
+        for theme in files:
+            if os.path.isdir(theme):
+                themes.append(theme)
+        
         cwidget = QWidget()
         clayout = QVBoxLayout()
         cwidget.setLayout(clayout)
         self.setCentralWidget(cwidget)
         self.hiddenelements = []
+        self.iconsheet = None
         
         clayout.addStretch(1)
         
@@ -140,23 +147,14 @@ class Window(QMainWindow):
         countlayout.addWidget(countspin2)
         clayout.addLayout(countlayout)
         
-        namelayout = QHBoxLayout()
-        namelayout.addStretch(1)
-        namebox = QLineEdit()
-        namebox.setMinimumSize(250, 30)
-        namebox.setPlaceholderText("Input Theme Name Here")
-        self.name = namebox
-        namelayout.addWidget(namebox)
-        namelayout.addStretch(1)
-        clayout.addLayout(namelayout)
-        
-        createlayout = QHBoxLayout()
-        createlayout.addStretch(1)
-        createbtn = QPushButton("Edit Theme", self)
-        createbtn.clicked.connect(self.launchEditerAct)
-        createlayout.addWidget(createbtn)
-        createlayout.addStretch(1)
-        clayout.addLayout(createlayout)
+        for theme in themes:
+            layout = QHBoxLayout()
+            layout.addStretch(1)
+            btn = QPushButton(theme, self)
+            btn.clicked.connect(self.launchMakerAct)
+            layout.addWidget(btn)
+            layout.addStretch(1)
+            clayout.addLayout(layout)
         
         clayout.addStretch(2)
         
@@ -174,7 +172,46 @@ class Window(QMainWindow):
         self.setCentralWidget(cwidget)
         
     def launchMakeWin(self):
-        print("add Make Later")
+        files = glob.glob("*")
+        themes = []
+        for theme in files:
+            if os.path.isdir(theme):
+                themes.append(theme)
+        
+        cwidget = QWidget()
+        clayout = QVBoxLayout()
+        cwidget.setLayout(clayout)
+        self.setCentralWidget(cwidget)
+        
+        clayout.addStretch(1)
+        
+        menulayout = QHBoxLayout()
+        menulayout.addStretch(1)
+        menulabel = QLabel("Please Pick one of your Themes")
+        menulayout.addWidget(menulabel)
+        menulayout.addStretch(1)
+        clayout.addLayout(menulayout)
+        
+        for theme in themes:
+            layout = QHBoxLayout()
+            layout.addStretch(1)
+            btn = QPushButton(theme, self)
+            btn.clicked.connect(self.launchSaverAct)
+            layout.addWidget(btn)
+            layout.addStretch(1)
+            clayout.addLayout(layout)
+        
+        clayout.addStretch(2)
+        
+        homelayout = QHBoxLayout()
+        homelayout.addStretch(1)
+        homebtn = QPushButton("Home", self)
+        homebtn.clicked.connect(self.launchLaunchWin)
+        homelayout.addWidget(homebtn)
+        homelayout.addStretch(1)
+        clayout.addLayout(homelayout)
+        
+        self.setCentralWidget(cwidget)
     
     def launchNewWin(self):
         cwidget = QWidget()
@@ -182,6 +219,7 @@ class Window(QMainWindow):
         cwidget.setLayout(clayout)
         self.setCentralWidget(cwidget)
         self.hiddenelements = []
+        self.iconsheet = None
         
         clayout.addStretch(1)
         
@@ -259,7 +297,7 @@ class Window(QMainWindow):
         createlayout = QHBoxLayout()
         createlayout.addStretch(1)
         createbtn = QPushButton("Create Theme", self)
-        createbtn.clicked.connect(self.launchEditerAct)
+        createbtn.clicked.connect(self.launchMakerAct)
         createlayout.addWidget(createbtn)
         createlayout.addStretch(1)
         clayout.addLayout(createlayout)
@@ -320,54 +358,54 @@ class Window(QMainWindow):
         else:
             update()
         
-    def launchEditerAct(self):
+    def launchMakerAct(self):
         sender = self.sender()
         if sender.text() == "Create Theme":
-            mode = False
-        else:
-            mode = True
-        if self.name.text() == "":
-            self.name.setFocus()
-            error = QMessageBox.question(self, "Message", "No Name Found", QMessageBox.Ok, QMessageBox.Ok)
-            return
-        
-        if os.path.isdir(self.name.text()):
-            if mode:
-                exsists = True
-            else:
+            if self.name.text() == "":
+                self.name.setFocus()
+                error = QMessageBox.question(self, "Message", "No Name Found", QMessageBox.Ok, QMessageBox.Ok)
+                return
+
+            if os.path.isdir(self.name.text()):
                 error = QMessageBox.question(self, "Message", "A Theme with the name "+self.name.text()+" already exsists", QMessageBox.Ok, QMessageBox.Ok)
                 return
+            
+            terminal.call(["mkdir", self.name.text()])
+            exsists = False
+            folder = self.name.text()
+        
         else:
-            if mode:
-                error = QMessageBox.question(self, "Message", "No Theme found with the name "+self.name.text()+" found", QMessageBox.Ok, QMessageBox.Ok)
-                return
-            else:
-                exsists = False
-                terminal.call(["mkdir", self.name.text()])
-        print(mode)
-        print(exsists)
+            exsists = True
+            folder = sender.text()
         
         S = self.spinS.value()
         R = self.spinR.value()
         C = self.spinC.value()
         G = self.spinG.value() + S
         
+        if self.iconsheet == None:
+            R = 0
+            C = 0
+        
         icons = []
         bicons = []
         
-        if R == 1 and C == 1:
-            ipic = self.iconsheet.crop ((0, 0, S, S))
-            icons.append(ipic)
-        else:
-            for rows in range(R):
-                for coll in range(C):
-                    ipic = self.iconsheet.crop((G*rows, G*coll, (G*rows)+S, (G*coll)+S))
-                    icons.append(ipic)
+        for rows in range(R):
+            for coll in range(C):
+                croppos = (G*coll, G*rows, (G*coll)+S, (G*rows)+S)
+                print(croppos)
+                ipic = self.iconsheet.crop(croppos)
+                icons.append(ipic)
         i = 0
         for entrie in icons:
-            entrie.save(self.name.text()+"/"+str(i)+".png")
+            entrie.save(folder+"/"+str(i)+".png")
             i += 1
-        terminal.call(["python3", "IconMaker.py", self.name.text(), str(i), str(exsists)])
+        terminal.call(["python3", "IconMaker.py", folder, str(i), str(exsists)])
+        
+    def launchSaverAct(self):
+        sender = self.sender()
+        print(sender.text())
+        terminal.call(["python3", "IconSaver.py", sender.text()])
     
 def main():
     app = QApplication(sys.argv)

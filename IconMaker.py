@@ -13,15 +13,13 @@ import io
 import glob
 img.MAX_IMAGE_PIXELS = 10000000000
 
-testicon = img.open("Inputs/exampleicon.png")
-
 class RawApp():
     def __init__(self):
         self.icon = None
-        self.name = None
-        self.urlscheme = None
+        self.name = ""
+        self.urlscheme = ""
         self.pos = None
-        self.exsists = False
+        self.exsists = True
     
     def setall(self, name, url, pos, icon):
         self.name = name
@@ -36,10 +34,14 @@ class RawApp():
 
 class SaveInfo():
     def __init__(self, inputs, package, exs):
-        self.exsistingapps = []
-        self.newapps = []
+        self.apps = []
         self.name = package
         self.exsists = exs
+        for icons in inputs:
+            newapp = RawApp()
+            newapp.icon = icons
+            newapp.exsists = False
+            self.apps.append(newapp)
         if exs:
             data = json.load(open(package+"/appdata.json", "r"))
             self.iconsheet = img.open(package+"/iconsheet.png")
@@ -48,11 +50,7 @@ class SaveInfo():
                 croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
                 icon = self.iconsheet.crop(croppos)
                 newapp.setall(keys, entries["url"], entries["pos"], icon)
-                self.exsistingapps.append(newapp)
-        for icons in inputs:
-            newapp = RawApp()
-            newapp.icon = icons
-            self.newapps.append(newapp)
+                self.apps.append(newapp)
             
 
 
@@ -65,6 +63,7 @@ class ApplicationEditorWindow(QMainWindow):
         self.initUI()
         
     def initUI(self):
+        app = self.SaveInfo.apps[self.app]
         cwidget = QWidget()
         clayout = QFormLayout()
         cwidget.setLayout(clayout)
@@ -77,6 +76,7 @@ class ApplicationEditorWindow(QMainWindow):
         namebox = QLineEdit()
         namebox.setMinimumSize(200, 30)
         namebox.setPlaceholderText("Snapchat")
+        namebox.setText(app.name)
         namebox.textChanged[str].connect(self.updateAct)
         namelayout.addWidget(namebox)
         namelayout.addStretch(1)
@@ -89,6 +89,7 @@ class ApplicationEditorWindow(QMainWindow):
         urlbox = QLineEdit()
         urlbox.setMinimumSize(200, 30)
         urlbox.setPlaceholderText("snapchat://")
+        urlbox.setText(app.urlscheme)
         urlbox.textChanged[str].connect(self.updateAct)
         urllayout.addWidget(urlbox)
         urllayout.addStretch(1)
@@ -96,7 +97,8 @@ class ApplicationEditorWindow(QMainWindow):
         
         imglayout = QHBoxLayout()
         imgbox = QLabel(self)
-        pixmap = QPixmap.fromImage(imgtoQt(self.SaveInfo.newapps[self.app].icon))
+        png = app.icon.resize((300, 300))
+        pixmap = QPixmap.fromImage(imgtoQt(png))
         imgbox.setPixmap(pixmap)
         imglayout.addWidget(imgbox)
         clayout.addRow(imglayout)
@@ -123,7 +125,7 @@ class ApplicationEditorWindow(QMainWindow):
         btnslayout.addWidget(savebtn)
         nextbtn = QPushButton(">", self)
         nextbtn.setMinimumSize(50, 30)
-        if len(self.SaveInfo.newapps) == (self.app + 1):
+        if len(self.SaveInfo.apps) == (self.app + 1):
             nextbtn.setEnabled(False)
         nextbtn.clicked.connect(self.changeSelectionAct)
         self.next = nextbtn
@@ -137,6 +139,7 @@ class ApplicationEditorWindow(QMainWindow):
         self.urlbox = urlbox
         self.infolabel = infolabel
         self.setFixedSize(self.size())
+        self.updateAct()
     
     def changeSelectionAct(self):
         sender = self.sender()
@@ -150,43 +153,53 @@ class ApplicationEditorWindow(QMainWindow):
         self.initUI()
     
     def updateAct(self):
-        app = self.SaveInfo.newapps[self.app]
+        app = self.SaveInfo.apps[self.app]
         sender = self.sender()
         if sender == self.namebox:
-            app.name = sender.text()
-            for eapps in self.SaveInfo.exsistingapps:
-                if eapps.name == app.name:
-                    app.exsists = True
-                    self.infolabel.setText("\""+app.name+"\" has been found in this theme.")
-                    break
-                else:
-                    app.exsists = False
-                    self.infolabel.setText("\""+app.name+"\" has not been added to this theme yet")
+            if not app.exsists:
+                app.name = sender.text()
+                for eapps in self.SaveInfo.apps:
+                    if eapps.name == app.name and eapps.exsists:
+                        self.infolabel.setText("\""+app.name+"\" has been found in this theme.")
+                        break
+                    else:
+                        self.infolabel.setText("\""+app.name+"\" is new to this theme")
+            else:
+                app.name = sender.text()
         if sender == self.urlbox:
             app.urlscheme = sender.text()
     
     def saveAct(self):
-        nextpos = len(self.SaveInfo.exsistingapps)
+        nextpos = 0
+        for apps in self.SaveInfo.apps:
+            if apps.exsists:
+                nextpos = nextpos + 1
         savedata = []
-        for napps in self.SaveInfo.newapps:
+        for napps in self.SaveInfo.apps:
             if napps.exsists:
-                for eapps in self.SaveInfo.exsistingapps:
-                    if napps.name == eapps.name:
-                        eapps.writeover(napps)
+                if napps.name != "":
+                    savedata.append(napps)
             else:
-                napps.pos = nextpos
-                savedata.append(napps)
-                nexpos = nextpos + 1
-        for eapps in self.SaveInfo.exsistingapps:
-            savedata.append(eapps)
+                writen = False
+                for eapps in self.SaveInfo.apps:
+                    if napps.name == eapps.name and eapps.exsists:
+                        eapps.writeover(napps)
+                        writen = True
+                if not writen:
+                    if napps.name != "":
+                        napps.pos = nextpos
+                        savedata.append(napps)
+                        nextpos = nextpos + 1
+        print(len(savedata))
+                
         savedict = {}
-        for entries in savedata:
-            savedict[entries.name] = {"url": entries.urlscheme, "pos": entries.pos}
-        json.dump(savedict, open(self.SaveInfo.name+"/appdata.json", "w"), indent=4)
         saveiconsheet = img.new("RGBA", (1024, len(savedata)*1024))
         for entries in savedata:
+            savedict[entries.name] = {"url": entries.urlscheme, "pos": entries.pos}
             saveicon = entries.icon.resize((1024, 1024))
             saveiconsheet.paste(saveicon, (0, entries.pos*1024))
+            print(entries.pos)
+        json.dump(savedict, open(self.SaveInfo.name+"/appdata.json", "w"), indent=4)
         saveiconsheet.save(self.SaveInfo.name+"/iconsheet.png")
         
 def main():
