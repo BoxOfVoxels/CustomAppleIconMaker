@@ -51,6 +51,7 @@ class BuildInfo():
             icon = iconsheet.crop(croppos)
             newapp.setall(keys, entries["url"], entries["pos"], icon)
             self.applist.append(newapp)
+        self.applist.sort(key=lambda x: x.name)
 
 class Window(QMainWindow):
     def __init__(self, BuildInfo):
