@@ -13,14 +13,75 @@ import io
 import glob
 img.MAX_IMAGE_PIXELS = 10000000000
 
+class RawApp():
+    def __init__(self):
+        self.icon = None
+        self.name = ""
+        self.urlscheme = ""
+        self.pos = None
+        self.exsists = False
+    
+    def setall(self, name, url, pos, icon):
+        self.name = name
+        self.urlscheme = url
+        self.pos = pos
+        self.icon = icon
+    
+    def writeover(self, over):
+        if over.urlscheme != "":
+            self.urlscheme = over.urlscheme
+        self.icon = over.icon
+        
+    def bicon(self):
+        fp = io.BytesIO()
+        self.icon.save(fp, format="png")
+        return(fp.getvalue())
+
+class BuildInfo():
+    def __init__(self, name):
+        self.OS = None
+        self.packlist = []
+        self.applist = []
+        self.client = name
+        data = json.load(open(name+"/appdata.json", "r"))
+        iconsheet = img.open(name+"/iconsheet.png")
+        for keys, entries in data.items():
+            newapp = RawApp()
+            croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
+            icon = iconsheet.crop(croppos)
+            newapp.setall(keys, entries["url"], entries["pos"], icon)
+            self.applist.append(newapp)
+        self.applist.sort(key=lambda x: x.name)
+        
+class ThemeInfo():
+    def __init__(self, inputs, package, exs):
+        self.apps = []
+        self.name = package
+        self.exsists = exs
+        for icons in inputs:
+            newapp = RawApp()
+            newapp.icon = icons
+            newapp.exsists = False
+            self.apps.append(newapp)
+        if exs:
+            data = json.load(open(package+"/appdata.json", "r"))
+            self.iconsheet = img.open(package+"/iconsheet.png")
+            for keys, entries in data.items():
+                newapp = RawApp()
+                croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
+                icon = self.iconsheet.crop(croppos)
+                newapp.setall(keys, entries["url"], entries["pos"], icon)
+                newapp.exsists = True
+                self.apps.append(newapp)
+        
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Apple Icon Maker")
         self.setGeometry(300, 100, 400, 600)
-        self.launchLaunchWin()
+        self.launchWin()
         
-    def launchLaunchWin(self):
+    def launchWin(self):
         cwidget = QWidget()
         clayout = QVBoxLayout()
         cwidget.setLayout(clayout)
@@ -39,7 +100,7 @@ class Window(QMainWindow):
         newlayout.addStretch(1)
         newbtn = QPushButton("Create a New theme", self)
         newbtn.setMinimumSize(300, 32)
-        newbtn.clicked.connect(self.launchNewWin)
+        newbtn.clicked.connect(self.inputsNewWin)
         newlayout.addWidget(newbtn)
         newlayout.addStretch(1)
         clayout.addLayout(newlayout)
@@ -48,7 +109,7 @@ class Window(QMainWindow):
         editlayout.addStretch(1)
         editbtn = QPushButton("Edit an exsisting theme", self)
         editbtn.setMinimumSize(300, 32)
-        editbtn.clicked.connect(self.launchEditWin)
+        editbtn.clicked.connect(self.editInputsWin)
         editlayout.addWidget(editbtn)
         editlayout.addStretch(1)
         clayout.addLayout(editlayout)
@@ -57,7 +118,7 @@ class Window(QMainWindow):
         makelayout.addStretch(1)
         makebtn = QPushButton("Make theme for your Device", self)
         makebtn.setMinimumSize(300, 32)
-        makebtn.clicked.connect(self.launchMakeWin)
+        makebtn.clicked.connect(self.inputsThemeWin)
         makelayout.addWidget(makebtn)
         makelayout.addStretch(1)
         clayout.addLayout(makelayout)
@@ -66,7 +127,7 @@ class Window(QMainWindow):
         
         self.show()
         
-    def launchEditWin(self):
+    def editInputsWin(self):
         files = glob.glob("*")
         themes = []
         for theme in files:
@@ -161,7 +222,7 @@ class Window(QMainWindow):
         homelayout = QHBoxLayout()
         homelayout.addStretch(1)
         homebtn = QPushButton("Home", self)
-        homebtn.clicked.connect(self.launchLaunchWin)
+        homebtn.clicked.connect(self.launchWin)
         homelayout.addWidget(homebtn)
         homelayout.addStretch(1)
         clayout.addLayout(homelayout)
@@ -171,7 +232,7 @@ class Window(QMainWindow):
 
         self.setCentralWidget(cwidget)
         
-    def launchMakeWin(self):
+    def inputsThemeWin(self):
         files = glob.glob("*")
         themes = []
         for theme in files:
@@ -206,14 +267,14 @@ class Window(QMainWindow):
         homelayout = QHBoxLayout()
         homelayout.addStretch(1)
         homebtn = QPushButton("Home", self)
-        homebtn.clicked.connect(self.launchLaunchWin)
+        homebtn.clicked.connect(self.launchWin)
         homelayout.addWidget(homebtn)
         homelayout.addStretch(1)
         clayout.addLayout(homelayout)
         
         self.setCentralWidget(cwidget)
     
-    def launchNewWin(self):
+    def inputsNewWin(self):
         cwidget = QWidget()
         clayout = QVBoxLayout()
         cwidget.setLayout(clayout)
@@ -307,13 +368,221 @@ class Window(QMainWindow):
         homelayout = QHBoxLayout()
         homelayout.addStretch(1)
         homebtn = QPushButton("Home", self)
-        homebtn.clicked.connect(self.launchLaunchWin)
+        homebtn.clicked.connect(self.launchWin)
         homelayout.addWidget(homebtn)
         homelayout.addStretch(1)
         clayout.addLayout(homelayout)
 
         self.setCentralWidget(cwidget)
+
+    def editWin(self):
+        app = self.themeInfo.apps[self.app]
+        cwidget = QWidget()
+        clayout = QFormLayout()
+        cwidget.setLayout(clayout)
+        
+        namelayout = QHBoxLayout()
+        namelayout.addStretch(1)
+        namelabel = QLabel("            Name: ")
+        namelayout.addWidget(namelabel)
+        namebox = QLineEdit()
+        namebox.setMinimumSize(200, 30)
+        namebox.setPlaceholderText("Snapchat")
+        namebox.setText(app.name)
+        namebox.textChanged[str].connect(self.updateAct)
+        namelayout.addWidget(namebox)
+        namelayout.addStretch(1)
+        clayout.addRow(namelayout)
+        
+        urllayout = QHBoxLayout()
+        urllayout.addStretch(1)
+        urllabel = QLabel("URL Scheme: ")
+        urllayout.addWidget(urllabel)
+        urlbox = QLineEdit()
+        urlbox.setMinimumSize(200, 30)
+        urlbox.setPlaceholderText("snapchat://")
+        urlbox.setText(app.urlscheme)
+        urlbox.textChanged[str].connect(self.updateAct)
+        urllayout.addWidget(urlbox)
+        urllayout.addStretch(1)
+        clayout.addRow(urllayout)
+        
+        imglayout = QHBoxLayout()
+        imgbox = QLabel(self)
+        png = app.icon.resize((300, 300))
+        pixmap = QPixmap.fromImage(imgtoQt(png))
+        imgbox.setPixmap(pixmap)
+        imglayout.addWidget(imgbox)
+        clayout.addRow(imglayout)
+        
+        dialayout = QHBoxLayout()
+        dialayout.addStretch(1)
+        infolabel = QLabel("")
+        dialayout.addWidget(infolabel)
+        dialayout.addStretch(1)
+        clayout.addRow(dialayout)
+                      
+        btnslayout = QHBoxLayout()
+        btnslayout.addStretch(1)
+        prevbtn = QPushButton("<", self)
+        prevbtn.setMinimumSize(50, 30)
+        if self.app == 0:
+            prevbtn.setEnabled(False)
+        prevbtn.clicked.connect(self.changeSelectionAct)
+        self.prev = prevbtn
+        btnslayout.addWidget(prevbtn)
+        savebtn = QPushButton("Save", self)
+        savebtn.setMinimumSize(200, 30)
+        savebtn.clicked.connect(self.saveAct)
+        btnslayout.addWidget(savebtn)
+        nextbtn = QPushButton(">", self)
+        nextbtn.setMinimumSize(50, 30)
+        if len(self.themeInfo.apps) == (self.app + 1):
+            nextbtn.setEnabled(False)
+        nextbtn.clicked.connect(self.changeSelectionAct)
+        self.next = nextbtn
+        btnslayout.addWidget(nextbtn)
+        btnslayout.addStretch(1)
+        clayout.addRow(btnslayout)
+        
+        self.show()
+        self.clayout = clayout
+        self.namebox = namebox
+        self.urlbox = urlbox
+        self.infolabel = infolabel
+        self.setFixedSize(self.size())
+        self.updateAct()
+        
+        self.setCentralWidget(cwidget)
     
+    def themeWin(self):
+        cwidget = QWidget()
+        clayout = QVBoxLayout()
+        cwidget.setLayout(clayout)
+        
+        btnlayout = QHBoxLayout()
+        btnlayout.addStretch(1)
+        iosbtn = QPushButton("Make iOS Icons", self)
+        iosbtn.clicked.connect(self.iOSAct)
+        btnlayout.addWidget(iosbtn)
+        macosbtn = QPushButton("Make macOS Icons", self)
+        macosbtn.clicked.connect(self.macOSAct)
+        btnlayout.addWidget(macosbtn)
+        btnlayout.addStretch(1)
+        clayout.addLayout(btnlayout)
+        
+        scroll = QScrollArea()
+        scrollbox = QGroupBox()
+        applistlayout = QVBoxLayout()
+        for entries in self.buildInfo.applist:
+            layout = QHBoxLayout()
+            
+            btn = QPushButton(entries.name, self)
+            btn.clicked.connect(self.selectAct)
+            layout.addWidget(btn)
+            
+            verticalSpacer = QSpacerItem(0, 100, QSizePolicy.Minimum, QSizePolicy.Expanding)
+            layout.addItem(verticalSpacer)
+            png = entries.icon
+            png = png.resize((100, 100))
+            qpng = imgtoQt(png)
+            pnglabel = QLabel(self)
+            pixmap = QPixmap.fromImage(qpng)
+            pnglabel.setPixmap(pixmap)
+            layout.addWidget(pnglabel)
+            
+            applistlayout.addLayout(layout)
+        scrollbox.setLayout(applistlayout)
+        scroll.setWidget(scrollbox)
+        scroll.setFixedHeight(600)
+        clayout.addWidget(scroll)
+
+        self.setCentralWidget(cwidget)
+        
+        
+        
+    def selectAct(self):
+        sender = self.sender()
+        for apps in self.buildInfo.applist:
+            if apps.name == sender.text():
+                app = apps
+        if sender.styleSheet() == "background-color: green":
+            self.buildInfo.packlist.remove(app)
+            sender.setStyleSheet("background-color: ")
+        else:
+            self.buildInfo.packlist.append(app)
+            sender.setStyleSheet("background-color: green")
+    
+    def iOSAct(self):
+        iOS(self.buildInfo)
+        
+    def macOSAct(self):
+        macOS(self.buildInfo)
+
+
+    def changeSelectionAct(self):
+        sender = self.sender()
+        if sender == self.prev:
+            self.app = self.app - 1
+        elif sender == self.next:
+            self.app = self.app + 1
+        else:
+            print("failed to ident sender")
+            return
+        self.editWin()
+    
+    def updateAct(self):
+        app = self.themeInfo.apps[self.app]
+        sender = self.sender()
+        if sender == self.namebox:
+            if not app.exsists:
+                app.name = sender.text()
+                for eapps in self.themeInfo.apps:
+                    if eapps.name == app.name and eapps.exsists:
+                        self.infolabel.setText("\""+app.name+"\" has been found in this theme.")
+                        break
+                    else:
+                        self.infolabel.setText("\""+app.name+"\" is new to this theme")
+            else:
+                app.name = sender.text()
+        if sender == self.urlbox:
+            app.urlscheme = sender.text()
+    
+    def saveAct(self):
+        nextpos = 0
+        for apps in self.themeInfo.apps:
+            if apps.exsists:
+                nextpos = nextpos + 1
+        savedata = []
+        for napps in self.themeInfo.apps:
+            if napps.exsists:
+                if napps.name != "":
+                    savedata.append(napps)
+            else:
+                writen = False
+                for eapps in self.themeInfo.apps:
+                    if napps.name == eapps.name and eapps.exsists:
+                        print("write over called")
+                        eapps.writeover(napps)
+                        writen = True
+                if not writen:
+                    print("not writen")
+                    if napps.name != "":
+                        print("appsaved")
+                        napps.pos = nextpos
+                        savedata.append(napps)
+                        nextpos = nextpos + 1
+                
+        savedict = {}
+        saveiconsheet = img.new("RGBA", (1024, len(savedata)*1024))
+        for entries in savedata:
+            savedict[entries.name] = {"url": entries.urlscheme, "pos": entries.pos}
+            saveicon = entries.icon.resize((1024, 1024))
+            saveiconsheet.paste(saveicon, (0, entries.pos*1024))
+        json.dump(savedict, open(self.themeInfo.name+"/appdata.json", "w"), indent=4)
+        saveiconsheet.save(self.themeInfo.name+"/iconsheet.png")
+        self.launchWin()
+        
     def updateEditSettingsAct(self):
         def update():
             S = self.spinS.value()
@@ -372,11 +641,11 @@ class Window(QMainWindow):
             
             terminal.call(["mkdir", self.name.text()])
             exsists = False
-            folder = self.name.text()
+            name = self.name.text()
         
         else:
             exsists = True
-            folder = sender.text()
+            name = sender.text()
         
         S = self.spinS.value()
         R = self.spinR.value()
@@ -388,24 +657,78 @@ class Window(QMainWindow):
             C = 0
         
         icons = []
-        bicons = []
         
         for rows in range(R):
             for coll in range(C):
                 croppos = (G*coll, G*rows, (G*coll)+S, (G*rows)+S)
-                print(croppos)
                 ipic = self.iconsheet.crop(croppos)
                 icons.append(ipic)
-        i = 0
-        for entrie in icons:
-            entrie.save(folder+"/"+str(i)+".png")
-            i += 1
-        terminal.call(["python3", "IconMaker.py", folder, str(i), str(exsists)])
+
+        #terminal.call(["python3", "IconMaker.py", name, str(i), str(exsists)])
+        self.themeInfo = ThemeInfo(icons, name, exsists)
+        self.app = 0
+        self.editWin()
+        
         
     def launchSaverAct(self):
         sender = self.sender()
-        print(sender.text())
-        terminal.call(["python3", "IconSaver.py", sender.text()])
+#        terminal.call(["python3", "IconSaver.py", sender.text()])
+        self.buildInfo = BuildInfo(sender.text())
+        self.themeWin()
+
+def iOS(buildInfo):
+    def icondict(app, buildInfo):
+        #gen plist dict for app
+        answer = dict(
+            PayloadType = "com.apple.webClip.managed",
+            PayloadVersion = 1,
+            PayloadIdentifier = "com.boxofvoxels."+buildInfo.client+"-"+app.name,
+            PayloadUUID = str(uuid.uuid4()),
+            PayloadDisplayName = app.name,
+            PayloadDescription = app.name+"Icon",
+            PayloadOrganization = "Box Of Voxels iCons",
+            URL = app.urlscheme,
+            Label = app.name,
+            Icon = app.bicon(),
+            IsRemovable = True,
+            FullScreen = True,
+        )
+        return(answer)
+    #Build iOS icon package
+    packedapps = []
+    for app in buildInfo.packlist:
+        if app.urlscheme != "":
+            packedapps.append(icondict(app, buildInfo))
+        else:
+            app.icon.save(buildInfo.client+"/"+app.name+".png")
+    
+    buildfile = dict(
+        PayloadType = "Configuration",
+        PayloadVersion = 1,
+        PayloadOrganization = "Box Of Voxel iCons",
+        PayloadIdentifier = "com.boxofvoxels."+buildInfo.client,
+        PayloadUUID = str(uuid.uuid4()),
+        PayloadDisplayName = buildInfo.client,
+        PayloadDescription = "",
+        PayloadRemovalDisallow = False,
+        PayloadContent = packedapps,
+    )
+    
+    package = open(buildInfo.client+"/"+buildInfo.client+"iconpackage.mobileconfig", "wb")
+    pll.dump(buildfile, package)
+    package.close()
+
+def macOS(buildInfo):
+    transformkey = [(1024, "512x512@2x"), (512, "512x512"), (512, "256x256@2x"), (256, "256x256"), (256, "128x128@2x"), (128, "128x128"), (64, "32x32@2x"), (32, "32x32"), (32, "16@2x"), (16, "16x16")]
+    for app in buildInfo.packlist:
+        terminal.call(["mkdir", app.name+".iconset"])
+        for size, savename in transformkey:
+            scaledicon = app.icon.resize((size, size))
+            scaledicon.save(app.name+".iconset/icon_"+savename+".png")
+        terminal.call(["iconutil", "-c", "icns", app.name+".iconset"])
+        terminal.call(["rm", "-rf", app.name+".iconset"])
+        terminal.call(["mv", app.name+".icns", buildInfo.client+"/"])
+
     
 def main():
     app = QApplication(sys.argv)
