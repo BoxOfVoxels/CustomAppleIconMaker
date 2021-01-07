@@ -21,6 +21,7 @@ class RawApp():
         self.urlscheme = ""
         self.pos = None
         self.exsists = False
+        self.btn = None
     
     def setall(self, name, url, pos, icon):
         self.name = name
@@ -40,45 +41,35 @@ class RawApp():
     
     def bicon(self):
         fp = io.BytesIO()
-        self.iosicon.save(fp, format="png")
+        self.iosicon().save(fp, format="png")
         return(fp.getvalue())
-
-class BuildInfo():
-    def __init__(self, name):
-        self.OS = None
-        self.packlist = []
-        self.applist = []
-        self.client = name
-        data = json.load(open(name+"/appdata.json", "r"))
-        iconsheet = img.open(name+"/iconsheet.png")
-        for keys, entries in data.items():
-            newapp = RawApp()
-            croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
-            icon = iconsheet.crop(croppos)
-            newapp.setall(keys, entries["url"], entries["pos"], icon)
-            self.applist.append(newapp)
-        self.applist.sort(key=lambda x: x.name)
         
-class ThemeInfo():
-    def __init__(self, inputs, package, exs):
+class RawTheme():
+    def __init__(self, name, newapps = [], exs = True):
+        self.OS = None
         self.apps = []
-        self.name = package
+        self.packlist = []
+        self.name = name
         self.exsists = exs
-        for icons in inputs:
+        for icons in newapps:
             newapp = RawApp()
             newapp.icon = icons
             newapp.exsists = False
             self.apps.append(newapp)
         if exs:
-            data = json.load(open(package+"/appdata.json", "r"))
-            self.iconsheet = img.open(package+"/iconsheet.png")
+            sort = []
+            data = json.load(open(name+"/appdata.json", "r"))
+            self.iconsheet = img.open(name+"/iconsheet.png")
             for keys, entries in data.items():
                 newapp = RawApp()
                 croppos = (0, entries["pos"]*1024, 1024, (entries["pos"]+1)*1024)
                 icon = self.iconsheet.crop(croppos)
                 newapp.setall(keys, entries["url"], entries["pos"], icon)
                 newapp.exsists = True
-                self.apps.append(newapp)
+                sort.append(newapp)
+            sort.sort(key=lambda x: x.name)
+            for app in sort:
+                self.apps.append(app)
         
 class Window(QMainWindow):
     def __init__(self):
@@ -335,7 +326,7 @@ class Window(QMainWindow):
         self.setCentralWidget(cwidget)
 
     def editWin(self):
-        app = self.themeInfo.apps[self.app]
+        app = self.rawTheme.apps[self.app]
         cwidget = QWidget()
         clayout = QFormLayout()
         cwidget.setLayout(clayout)
@@ -396,7 +387,7 @@ class Window(QMainWindow):
         btnslayout.addWidget(savebtn)
         nextbtn = QPushButton(">", self)
         nextbtn.setMinimumSize(50, 30)
-        if len(self.themeInfo.apps) == (self.app + 1):
+        if len(self.rawTheme.apps) == (self.app + 1):
             nextbtn.setEnabled(False)
         nextbtn.clicked.connect(self.changeSelectionAct)
         self.next = nextbtn
@@ -433,12 +424,13 @@ class Window(QMainWindow):
         scroll = QScrollArea()
         scrollbox = QGroupBox()
         applistlayout = QVBoxLayout()
-        for entries in self.buildInfo.applist:
+        for entries in self.rawTheme.apps:
             layout = QHBoxLayout()
             
             btn = QPushButton(entries.name, self)
             btn.clicked.connect(self.selectAct)
             layout.addWidget(btn)
+            entries.btn = btn
             
             verticalSpacer = QSpacerItem(0, 100, QSizePolicy.Minimum, QSizePolicy.Expanding)
             layout.addItem(verticalSpacer)
@@ -455,6 +447,20 @@ class Window(QMainWindow):
         scroll.setWidget(scrollbox)
         scroll.setFixedHeight(600)
         clayout.addWidget(scroll)
+        
+        sellayout = QHBoxLayout()
+        sellayout.addStretch(1)
+        abtn = QPushButton("Select All", self)
+        abtn.clicked.connect(self.selectGroupAct)
+        sellayout.addWidget(abtn)
+        ibtn = QPushButton("Select All iOS Apps", self)
+        ibtn.clicked.connect(self.selectGroupAct)
+        sellayout.addWidget(ibtn)
+        nbtn = QPushButton("Deselect All", self)
+        nbtn.clicked.connect(self.selectGroupAct)
+        sellayout.addWidget(nbtn)
+        sellayout.addStretch(1)
+        clayout.addLayout(sellayout)
 
         self.setCentralWidget(cwidget)
         
@@ -515,7 +521,26 @@ class Window(QMainWindow):
         
         clayout.addStretch(2)
         self.setCentralWidget(cwidget)
-        
+    
+    def selectGroupAct(self):
+        sender = self.sender()
+        if sender.text() == "Select All":
+            for apps in self.rawTheme.apps:
+                apps.btn.setStyleSheet("background-color: green")
+                if apps not in self.rawTheme.packlist:
+                    self.rawTheme.packlist.append(apps)
+        if sender.text() == "Deselect All":
+            for apps in self.rawTheme.apps:
+                apps.btn.setStyleSheet("background-color: ")
+            self.rawTheme.packlist = []
+        if sender.text() == "Select All iOS Apps":
+            for apps in self.rawTheme.apps:
+                print(apps.name + ": " + apps.urlscheme)
+                if apps.urlscheme != "":
+                    apps.btn.setStyleSheet("background-color: green")
+                    if apps not in self.rawTheme.packlist:
+                        self.rawTheme.packlist.append(apps)
+                    
         
     def deleteThemeAct(self):
         terminal.call(["rm", "-rf", self.datasheet])
@@ -523,22 +548,22 @@ class Window(QMainWindow):
         
     def selectAct(self):
         sender = self.sender()
-        for apps in self.buildInfo.applist:
+        for apps in self.rawTheme.apps:
             if apps.name == sender.text():
                 app = apps
         if sender.styleSheet() == "background-color: green":
-            self.buildInfo.packlist.remove(app)
+            self.rawTheme.packlist.remove(app)
             sender.setStyleSheet("background-color: ")
         else:
-            self.buildInfo.packlist.append(app)
+            self.rawTheme.packlist.append(app)
             sender.setStyleSheet("background-color: green")
     
     def iOSAct(self):
-        iOS(self.buildInfo)
+        iOS(self.rawTheme)
         self.launchWin()
         
     def macOSAct(self):
-        macOS(self.buildInfo)
+        macOS(self.rawTheme)
         self.launchWin()
 
     def launchInfoAct(self):
@@ -557,12 +582,12 @@ class Window(QMainWindow):
         self.editWin()
     
     def updateAct(self):
-        app = self.themeInfo.apps[self.app]
+        app = self.rawTheme.apps[self.app]
         sender = self.sender()
         if sender == self.namebox:
             if not app.exsists:
                 app.name = sender.text()
-                for eapps in self.themeInfo.apps:
+                for eapps in self.rawTheme.apps:
                     if eapps.name == app.name and eapps.exsists:
                         self.infolabel.setText("\""+app.name+"\" has been found in this theme.")
                         break
@@ -575,17 +600,17 @@ class Window(QMainWindow):
     
     def saveAct(self):
         nextpos = 0
-        for apps in self.themeInfo.apps:
+        for apps in self.rawTheme.apps:
             if apps.exsists:
                 nextpos = nextpos + 1
         savedata = []
-        for napps in self.themeInfo.apps:
+        for napps in self.rawTheme.apps:
             if napps.exsists:
                 if napps.name != "":
                     savedata.append(napps)
             else:
                 writen = False
-                for eapps in self.themeInfo.apps:
+                for eapps in self.rawTheme.apps:
                     if napps.name == eapps.name and eapps.exsists:
                         print("write over called")
                         eapps.writeover(napps)
@@ -604,8 +629,8 @@ class Window(QMainWindow):
             savedict[entries.name] = {"url": entries.urlscheme, "pos": entries.pos}
             saveicon = entries.icon.resize((1024, 1024))
             saveiconsheet.paste(saveicon, (0, entries.pos*1024))
-        json.dump(savedict, open(self.themeInfo.name+"/appdata.json", "w"), indent=4)
-        saveiconsheet.save(self.themeInfo.name+"/iconsheet.png")
+        json.dump(savedict, open(self.rawTheme.name+"/appdata.json", "w"), indent=4)
+        saveiconsheet.save(self.rawTheme.name+"/iconsheet.png")
         self.launchWin()
         
     def updateEditSettingsAct(self):
@@ -658,12 +683,11 @@ class Window(QMainWindow):
                 return
             
             terminal.call(["mkdir", self.name.text()])
-            exsists = False
             name = self.name.text()
-        
+            exsists = False
         else:
-            exsists = True
             name = sender.text()
+            exsists = True
         
         S = self.spinS.value()
         R = self.spinR.value()
@@ -682,23 +706,23 @@ class Window(QMainWindow):
                 ipic = self.iconsheet.crop(croppos)
                 icons.append(ipic)
 
-        self.themeInfo = ThemeInfo(icons, name, exsists)
+        self.rawTheme = RawTheme(name, newapps = icons, exs = exsists)
         self.app = 0
         self.editWin()
         
         
     def launchSaverAct(self):
         sender = self.sender()
-        self.buildInfo = BuildInfo(sender.text())
+        self.rawTheme = RawTheme(sender.text())
         self.themeWin()
 
-def iOS(buildInfo):
-    def icondict(app, buildInfo):
+def iOS(rawTheme):
+    def icondict(app, rawTheme):
         #gen plist dict for app
         answer = dict(
             PayloadType = "com.apple.webClip.managed",
             PayloadVersion = 1,
-            PayloadIdentifier = "com.boxofvoxels."+buildInfo.client+"-"+app.name,
+            PayloadIdentifier = "com.boxofvoxels."+rawTheme.name+"-"+app.name,
             PayloadUUID = str(uuid.uuid4()),
             PayloadDisplayName = app.name,
             PayloadDescription = app.name+"Icon",
@@ -712,38 +736,38 @@ def iOS(buildInfo):
         return(answer)
     #Build iOS icon package
     packedapps = []
-    for app in buildInfo.packlist:
+    for app in rawTheme.packlist:
         if app.urlscheme != "":
-            packedapps.append(icondict(app, buildInfo))
+            packedapps.append(icondict(app, rawTheme))
         else:
-            app.iosicon().save(buildInfo.client+"/"+app.name+".png")
+            app.iosicon().save(rawTheme.name+"/"+app.name+".png")
     
     buildfile = dict(
         PayloadType = "Configuration",
         PayloadVersion = 1,
         PayloadOrganization = "Box Of Voxel iCons",
-        PayloadIdentifier = "com.boxofvoxels."+buildInfo.client,
+        PayloadIdentifier = "com.boxofvoxels."+rawTheme.name,
         PayloadUUID = str(uuid.uuid4()),
-        PayloadDisplayName = buildInfo.client,
+        PayloadDisplayName = rawTheme.name,
         PayloadDescription = "",
         PayloadRemovalDisallow = False,
         PayloadContent = packedapps,
     )
     
-    package = open(buildInfo.client+"/"+buildInfo.client+"iconpackage.mobileconfig", "wb")
+    package = open(rawTheme.name+"/"+rawTheme.name+"iconpackage.mobileconfig", "wb")
     pll.dump(buildfile, package)
     package.close()
 
-def macOS(buildInfo):
+def macOS(rawTheme):
     transformkey = [(1024, "512x512@2x"), (512, "512x512"), (512, "256x256@2x"), (256, "256x256"), (256, "128x128@2x"), (128, "128x128"), (64, "32x32@2x"), (32, "32x32"), (32, "16@2x"), (16, "16x16")]
-    for app in buildInfo.packlist:
+    for app in rawTheme.packlist:
         terminal.call(["mkdir", app.name+".iconset"])
         for size, savename in transformkey:
             scaledicon = app.icon.resize((size, size))
             scaledicon.save(app.name+".iconset/icon_"+savename+".png")
         terminal.call(["iconutil", "-c", "icns", app.name+".iconset"])
         terminal.call(["rm", "-rf", app.name+".iconset"])
-        terminal.call(["mv", app.name+".icns", buildInfo.client+"/"])
+        terminal.call(["mv", app.name+".icns", rawTheme.name+"/"])
 
     
 def main():
